@@ -19,6 +19,7 @@ import { BTokenBytes } from '../types/templates/Pool/BTokenBytes'
 import { BToken } from '../types/templates/Pool/BToken'
 import { CRPFactory } from '../types/Factory/CRPFactory'
 import { ConfigurableRightsPool } from '../types/Factory/ConfigurableRightsPool'
+import { PowerOracle } from '../types/PowerOracle/PowerOracle'
 
 export let ZERO_BD = BigDecimal.fromString('0')
 
@@ -132,37 +133,19 @@ export function createPoolTokenEntity(id: string, pool: string, address: string)
   poolToken.save()
 }
 
-export function updatePoolLiquidity(id: string): void {
+export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
   let pool = Pool.load(id)
   let tokensList: Array<Bytes> = pool.tokensList
 
   if (!tokensList || pool.tokensCount.lt(BigInt.fromI32(2)) || !pool.publicSwap) return
 
-  // Find pool liquidity
-
-  let hasPrice = false
-  let hasUsdPrice = false
   let poolLiquidity = ZERO_BD
-
-  if (tokensList.includes(Address.fromString(USD))) {
-    let usdPoolTokenId = id.concat('-').concat(USD)
-    let usdPoolToken = PoolToken.load(usdPoolTokenId)
-    poolLiquidity = usdPoolToken.balance.div(usdPoolToken.denormWeight).times(pool.totalWeight)
-    hasPrice = true
-    hasUsdPrice = true
-  } else if (tokensList.includes(Address.fromString(WETH))) {
-    let wethTokenPrice = TokenPrice.load(WETH)
-    if (wethTokenPrice !== null) {
-      let poolTokenId = id.concat('-').concat(WETH)
-      let poolToken = PoolToken.load(poolTokenId)
-      poolLiquidity = wethTokenPrice.price.times(poolToken.balance).div(poolToken.denormWeight).times(pool.totalWeight)
-      hasPrice = true
-    }
-  }
 
   // Create or update token price
 
-  if (hasPrice) {
+  let powerOracle = PowerOracle.bind(Address.fromString('0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB'));
+
+  if (blockNumber.gt(BigInt.fromI32(11146897))) {
     for (let i: i32 = 0; i < tokensList.length; i++) {
       let tokenPriceId = tokensList[i].toHexString()
       let tokenPrice = TokenPrice.load(tokenPriceId)
@@ -175,23 +158,19 @@ export function updatePoolLiquidity(id: string): void {
       let poolTokenId = id.concat('-').concat(tokenPriceId)
       let poolToken = PoolToken.load(poolTokenId)
 
-      if (
-        (tokenPrice.poolTokenId == poolTokenId || poolLiquidity.gt(tokenPrice.poolLiquidity)) &&
-        (tokenPriceId != WETH.toString() || (pool.tokensCount.equals(BigInt.fromI32(2)) && hasUsdPrice))
-      ) {
-        tokenPrice.price = ZERO_BD
-
-        if (poolToken.balance.gt(ZERO_BD)) {
-          tokenPrice.price = poolLiquidity.div(pool.totalWeight).times(poolToken.denormWeight).div(poolToken.balance)
-        }
-
-        tokenPrice.symbol = poolToken.symbol
-        tokenPrice.name = poolToken.name
-        tokenPrice.decimals = poolToken.decimals
-        tokenPrice.poolLiquidity = poolLiquidity
-        tokenPrice.poolTokenId = poolTokenId
-        tokenPrice.save()
+      // It is enough to assign the poolLiquidity using only the first token weight
+      if (i === 0) {
+        poolLiquidity = poolToken.balance.div(poolToken.denormWeight).times(pool.totalWeight)
       }
+
+      tokenPrice.price = powerOracle.getPriceBySymbol(poolToken.symbol).toBigDecimal().div(BigDecimal.fromString("1000000"));
+
+      tokenPrice.symbol = poolToken.symbol
+      tokenPrice.name = poolToken.name
+      tokenPrice.decimals = poolToken.decimals
+      tokenPrice.poolLiquidity = poolLiquidity
+      tokenPrice.poolTokenId = poolTokenId
+      tokenPrice.save()
     }
   }
 

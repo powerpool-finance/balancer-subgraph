@@ -81,6 +81,7 @@ type Swap @entity {
     userAddress: User                       # User address that initiates the swap
     value: BigDecimal!                      # Swap value in USD
     feeValue: BigDecimal!                   # Swap fee value in USD
+    communityFeeValue: BigDecimal!          # Swapp community fee value in USD
     poolTotalSwapVolume: BigDecimal!        # Total pool swap volume in USD
     poolTotalSwapFee: BigDecimal!           # Total pool swap fee in USD
     poolLiquidity: BigDecimal!              # Pool liquidity value in USD

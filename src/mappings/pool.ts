@@ -17,7 +17,7 @@ import {
   createPoolTokenEntity,
   updatePoolLiquidity,
   saveTransaction,
-  ZERO_BD
+  ZERO_BD, doPoolPriceCheckpoint
 } from './helpers'
 
 /************************************
@@ -328,6 +328,7 @@ export function handleSwap(event: LOG_SWAP): void {
     poolShareTo.balance += tokenToDecimal(event.params.value.toBigDecimal(), 18)
     poolShareTo.save()
     pool.totalShares += tokenToDecimal(event.params.value.toBigDecimal(), 18)
+    doPoolPriceCheckpoint(event.block, pool as Pool)
   } else if (isBurn) {
     if (poolShareFrom == null) {
     createPoolShareEntity(poolShareFromId, poolId, event.params.from.toHex())
@@ -336,6 +337,7 @@ export function handleSwap(event: LOG_SWAP): void {
     poolShareFrom.balance -= tokenToDecimal(event.params.value.toBigDecimal(), 18)
     poolShareFrom.save()
     pool.totalShares -= tokenToDecimal(event.params.value.toBigDecimal(), 18)
+    doPoolPriceCheckpoint(event.block, pool as Pool)
   } else {
     if (poolShareTo == null) {
       createPoolShareEntity(poolShareToId, poolId, event.params.to.toHex())

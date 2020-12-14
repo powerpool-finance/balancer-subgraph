@@ -10,7 +10,7 @@ dataSources:
     source:
       address: "0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB"
       abi: PowerOracle
-      startBlock: 11108676
+      startBlock: 11352346
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.4
@@ -22,15 +22,15 @@ dataSources:
         - name: PowerOracle
           file: ./abis/PowerOracle.json
       eventHandlers:
-        - event: SetGasPriceLimit(uint256)
-          handler: handleOraclePriceUpdated
+        - event: AnchorPriceUpdated(string,uint256,uint256,uint256)
+          handler: handleUnindexedUpdate
   - kind: ethereum/contract
     name: Factory
     network: mainnet
     source:
-      address: "0xB794be37e08625305Ba7AD39C133F4a9Aa7faaB8"
+      address: "0x0Ba2e75FE1368d8d517BE1Db5C39ca50a1429441"
       abi: Factory
-      startBlock: 11010120
+      startBlock: 11362346
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.4
@@ -90,6 +90,9 @@ templates:
           handler: handleRebind
         - event: LOG_CALL(indexed bytes4,indexed address,bytes)
           topic0: "0xe4e1e53800000000000000000000000000000000000000000000000000000000"
+          handler: handleRebind
+        - event: LOG_CALL(indexed bytes4,indexed address,bytes)
+          topic0: "0x4d752ec300000000000000000000000000000000000000000000000000000000"
           handler: handleRebind
         - event: LOG_CALL(indexed bytes4,indexed address,bytes)
           topic0: "0xcf5e7bd300000000000000000000000000000000000000000000000000000000"

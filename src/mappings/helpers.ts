@@ -4,7 +4,7 @@ import {
   BigInt,
   Bytes,
   dataSource,
-  ethereum
+  ethereum, log
 } from '@graphprotocol/graph-ts'
 import {
   Pool,
@@ -13,7 +13,7 @@ import {
   PoolShare,
   TokenPrice,
   Transaction,
-  Balancer
+  Balancer, PiptPrice
 } from '../types/schema'
 import { BTokenBytes } from '../types/templates/Pool/BTokenBytes'
 import { BToken } from '../types/templates/Pool/BToken'
@@ -133,6 +133,22 @@ export function createPoolTokenEntity(id: string, pool: string, address: string)
   poolToken.save()
 }
 
+let PIPT_PREFIX = "PIPT";
+export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool): void {
+  let id = PIPT_PREFIX.concat("-").concat(block.timestamp.toString());
+  let pipt = PiptPrice.load(id);
+  if (pipt == null) {
+    pipt = new PiptPrice(id);
+  }
+
+  // log.warning("piptCheckpoint {}/{}", [pool.liquidity.toString(), pool.totalShares.toString()]);
+  pipt.price = pool.liquidity.div(pool.totalShares);
+  pipt.totalSupply = pool.totalShares;
+  pipt.liquidity = pool.liquidity;
+  pipt.timestamp = block.timestamp.toI32();
+  pipt.save();
+}
+
 export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
   let pool = Pool.load(id)
   let tokensList: Array<Bytes> = pool.tokensList
@@ -145,7 +161,7 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
 
   let powerOracle = PowerOracle.bind(Address.fromString('0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB'));
 
-  if (blockNumber.gt(BigInt.fromI32(11146897))) {
+  // if (blockNumber.gt(BigInt.fromI32(11146897))) {
     for (let i: i32 = 0; i < tokensList.length; i++) {
       let tokenPriceId = tokensList[i].toHexString()
       let tokenPrice = TokenPrice.load(tokenPriceId)
@@ -172,7 +188,7 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
       tokenPrice.poolTokenId = poolTokenId
       tokenPrice.save()
     }
-  }
+  // }
 
   // Update pool liquidity
 

@@ -1,4 +1,4 @@
-import { Address, BigInt, BigDecimal } from '@graphprotocol/graph-ts'
+import { Address, BigInt, BigDecimal, log } from '@graphprotocol/graph-ts'
 import { LOG_NEW_POOL } from '../types/Factory/Factory'
 import { Balancer, Pool } from '../types/schema'
 import { Pool as PoolContract } from '../types/templates'
@@ -12,6 +12,7 @@ import {
   getCrpCap
 } from './helpers'
 import { ConfigurableRightsPool } from '../types/Factory/ConfigurableRightsPool';
+import {getConfig} from "./config";
 
 export function handleNewPool(event: LOG_NEW_POOL): void {
   let factory = Balancer.load('1')
@@ -64,6 +65,12 @@ export function handleNewPool(event: LOG_NEW_POOL): void {
   if (pool.crp) factory.crpCount = factory.crpCount + 1
   factory.poolCount = factory.poolCount + 1
   factory.save()
+
+  let config = getConfig();
+  config.piptPoolId = event.params.pool;
+  config.save();
+
+  log.warning("New Pool ID: {}", [pool.id]);
 
   PoolContract.create(event.params.pool)
 }

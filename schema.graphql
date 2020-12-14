@@ -120,3 +120,16 @@ enum SwapType {
     exitswapPoolAmountIn,
     exitswapExternAmountOut
 }
+
+type PiptPrice @entity {
+    id: ID!
+    price: BigDecimal!
+    timestamp: Int!
+    totalSupply: BigDecimal!
+    liquidity: BigDecimal!
+}
+
+type Config @entity {
+    id: ID!
+    piptPoolId: Bytes
+}

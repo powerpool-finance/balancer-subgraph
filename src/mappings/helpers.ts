@@ -161,7 +161,7 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
 
   let powerOracle = PowerOracle.bind(Address.fromString('0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB'));
 
-  // if (blockNumber.gt(BigInt.fromI32(11146897))) {
+  if (blockNumber.gt(BigInt.fromI32(11146897))) {
     for (let i: i32 = 0; i < tokensList.length; i++) {
       let tokenPriceId = tokensList[i].toHexString()
       let tokenPrice = TokenPrice.load(tokenPriceId)
@@ -179,7 +179,13 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
         poolLiquidity = poolToken.balance.div(poolToken.denormWeight).times(pool.totalWeight)
       }
 
-      tokenPrice.price = powerOracle.getPriceBySymbol(poolToken.symbol).toBigDecimal().div(BigDecimal.fromString("1000000"));
+      let res = powerOracle.try_getPriceBySymbol(poolToken.symbol);
+      if (res.reverted) {
+        log.warning("Missing oracle info for token {}", [tokenPrice.name])
+        tokenPrice.price = BigDecimal.fromString("0");
+      } else {
+        tokenPrice.price = res.value.toBigDecimal().div(BigDecimal.fromString("1000000"))
+      }
 
       tokenPrice.symbol = poolToken.symbol
       tokenPrice.name = poolToken.name
@@ -188,7 +194,7 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
       tokenPrice.poolTokenId = poolTokenId
       tokenPrice.save()
     }
-  // }
+  }
 
   // Update pool liquidity
 

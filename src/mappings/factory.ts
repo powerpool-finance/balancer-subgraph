@@ -12,7 +12,6 @@ import {
   getCrpCap
 } from './helpers'
 import { ConfigurableRightsPool } from '../types/Factory/ConfigurableRightsPool';
-import {getConfig} from "./config";
 
 export function handleNewPool(event: LOG_NEW_POOL): void {
   let factory = Balancer.load('1')
@@ -57,7 +56,9 @@ export function handleNewPool(event: LOG_NEW_POOL): void {
   pool.joinsCount = BigInt.fromI32(0)
   pool.exitsCount = BigInt.fromI32(0)
   pool.swapsCount = BigInt.fromI32(0)
-  pool.factoryID = event.address.toHexString()
+  pool.poolPriceCount = BigInt.fromI32(0)
+  pool.lastPoolPriceUpdate = 0;
+  pool.factoryID = "1"
   pool.tokensList = []
   pool.tx = event.transaction.hash
   pool.save()
@@ -65,10 +66,6 @@ export function handleNewPool(event: LOG_NEW_POOL): void {
   if (pool.crp) factory.crpCount = factory.crpCount + 1
   factory.poolCount = factory.poolCount + 1
   factory.save()
-
-  let config = getConfig();
-  config.piptPoolId = event.params.pool;
-  config.save();
 
   log.warning("New Pool ID: {}", [pool.id]);
 

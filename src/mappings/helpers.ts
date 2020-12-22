@@ -13,7 +13,8 @@ import {
   PoolShare,
   TokenPrice,
   Transaction,
-  Balancer, PiptPrice
+  Balancer,
+  PoolPrice
 } from '../types/schema'
 import { BTokenBytes } from '../types/templates/Pool/BTokenBytes'
 import { BToken } from '../types/templates/Pool/BToken'
@@ -22,6 +23,7 @@ import { ConfigurableRightsPool } from '../types/Factory/ConfigurableRightsPool'
 import { PowerOracle } from '../types/PowerOracle/PowerOracle'
 
 export let ZERO_BD = BigDecimal.fromString('0')
+let ONE_HOUR = 3600;
 
 let network = dataSource.network()
 
@@ -133,20 +135,40 @@ export function createPoolTokenEntity(id: string, pool: string, address: string)
   poolToken.save()
 }
 
-let PIPT_PREFIX = "PIPT";
 export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool): void {
-  let id = PIPT_PREFIX.concat("-").concat(block.timestamp.toString());
-  let pipt = PiptPrice.load(id);
-  if (pipt == null) {
-    pipt = new PiptPrice(id);
+  if (pool.lastPoolPriceUpdate + ONE_HOUR > block.timestamp.toI32()) {
+    log.info(
+      "doPoolPriceCheckpoint::Skipping checkpoint at {}, the last one is {}, the diff is {}",
+      [
+        block.timestamp.toString(),
+        BigInt.fromI32(pool.lastPoolPriceUpdate).toString(),
+        (BigInt.fromI32(pool.lastPoolPriceUpdate).minus(block.timestamp)).toString()
+      ]
+    );
+    return;
+  }
+  updatePoolLiquidity(pool.id, block.number);
+
+  let id = pool.id.concat("-").concat(block.timestamp.toString());
+  let poolPrice = PoolPrice.load(id);
+  if (poolPrice == null) {
+    poolPrice = new PoolPrice(id);
   }
 
-  // log.warning("piptCheckpoint {}/{}", [pool.liquidity.toString(), pool.totalShares.toString()]);
-  pipt.price = pool.liquidity.div(pool.totalShares);
-  pipt.totalSupply = pool.totalShares;
-  pipt.liquidity = pool.liquidity;
-  pipt.timestamp = block.timestamp.toI32();
-  pipt.save();
+  poolPrice.poolId = pool.id;
+  if (pool.totalShares.gt(BigDecimal.fromString("0"))) {
+    poolPrice.price = pool.liquidity.div(pool.totalShares);
+  }  else {
+    poolPrice.price = BigDecimal.fromString("0");
+  }
+  poolPrice.totalSupply = pool.totalShares;
+  poolPrice.liquidity = pool.liquidity;
+  poolPrice.timestamp = block.timestamp.toI32();
+  poolPrice.save();
+
+  pool.lastPoolPriceUpdate = block.timestamp.toI32();
+  pool.poolPriceCount = pool.poolPriceCount.plus(BigInt.fromI32(1));
+  pool.save();
 }
 
 export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {

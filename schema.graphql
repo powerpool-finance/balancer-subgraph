@@ -32,6 +32,9 @@ type Pool @entity {
     tokensList: [Bytes!]!                               # Temp workaround until graph supports filtering on derived field
     tokens: [PoolToken!] @derivedFrom(field: "poolId")
     shares: [PoolShare!] @derivedFrom(field: "poolId")
+    poolPrices: [PoolPrice!] @derivedFrom(field: "poolId")
+    lastPoolPriceUpdate: Int
+    poolPriceCount: BigInt!
     createTime: Int!                                    # Block time pool was created
     tokensCount: BigInt!                                # Number of tokens in the pool
     holdersCount: BigInt!                               # Number of addresses holding a positive balance of BPT
@@ -121,8 +124,9 @@ enum SwapType {
     exitswapExternAmountOut
 }
 
-type PiptPrice @entity {
+type PoolPrice @entity {
     id: ID!
+    poolId: Pool!
     price: BigDecimal!
     timestamp: Int!
     totalSupply: BigDecimal!

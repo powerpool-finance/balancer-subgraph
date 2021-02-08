@@ -48,6 +48,30 @@ dataSources:
       eventHandlers:
         - event: LOG_NEW_POOL(indexed address,indexed address)
           handler: handleNewPool
+  - kind: ethereum/contract
+    name: Factory 2
+    network: mainnet
+    source:
+      address: "0x967D77f1fBb5fD1846Ce156bAeD3AAf0B13020D1"
+      abi: Factory
+      startBlock: 11706591
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.4
+      language: wasm/assemblyscript
+      file: ./src/mappings/factory.ts
+      entities:
+        - Balancer
+      abis:
+        - name: Factory
+          file: ./abis/PowerIndexPoolFactory.json
+        - name: CRPFactory
+          file: ./abis/CRPFactory.json
+        - name: ConfigurableRightsPool
+          file: ./abis/ConfigurableRightsPool.json
+      eventHandlers:
+        - event: LOG_NEW_POOL(indexed address,indexed address,indexed address)
+          handler: handleNewPool
 templates:
   - kind: ethereum/contract
     name: Pool

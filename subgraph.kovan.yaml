@@ -5,6 +5,48 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: ethereum/contract
+    name: PowerOracleV2
+    network: kovan
+    source:
+      address: "0x8e9dF55678A20373A8af1f5C7F9683bffa551C07"
+      abi: PowerOracleV2
+      startBlock: 23361749
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.4
+      language: wasm/assemblyscript
+      file: ./src/mappings/oracle.ts
+      entities:
+        - PriceOracleV2
+      abis:
+        - name: PowerOracleV2
+          file: ./abis/PowerOracleV2.json
+      eventHandlers:
+        - event: AnchorPriceUpdated(string,uint256,uint256,uint256)
+          handler: handleUnindexedUpdateV2
+
+  - kind: ethereum/contract
+    name: PowerOracleV3
+    network: kovan
+    source:
+      address: "0x5c1175007B0718B7b96867F57Fa798736F708032"
+      abi: PowerOracleV3
+      startBlock: 23361862
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.4
+      language: wasm/assemblyscript
+      file: ./src/mappings/oracle.ts
+      entities:
+        - PriceOracleV3
+      abis:
+        - name: PowerOracleV3
+          file: ./abis/PowerOracleV3.json
+      eventHandlers:
+        - event: AnchorPriceUpdated(string,indexed bytes32,uint256,uint256,uint256)
+          handler: handleUnindexedUpdateV3
+
+  - kind: ethereum/contract
     name: Factory
     network: kovan
     source:
@@ -50,6 +92,10 @@ templates:
           file: ./abis/BToken.json
         - name: BTokenBytes
           file: ./abis/BTokenBytes32.json
+        - name: PowerOracleV2
+          file: ./abis/PowerOracleV2.json
+        - name: PowerOracleV3
+          file: ./abis/PowerOracleV3.json
       eventHandlers:
         - event: LOG_CALL(indexed bytes4,indexed address,bytes)
           topic0: "0x34e1990700000000000000000000000000000000000000000000000000000000"
@@ -68,6 +114,9 @@ templates:
           handler: handleRebind
         - event: LOG_CALL(indexed bytes4,indexed address,bytes)
           topic0: "0xe4e1e53800000000000000000000000000000000000000000000000000000000"
+          handler: handleRebind
+        - event: LOG_CALL(indexed bytes4,indexed address,bytes)
+          topic0: "0x4d752ec300000000000000000000000000000000000000000000000000000000"
           handler: handleRebind
         - event: LOG_CALL(indexed bytes4,indexed address,bytes)
           topic0: "0xcf5e7bd300000000000000000000000000000000000000000000000000000000"

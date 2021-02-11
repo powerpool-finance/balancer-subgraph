@@ -5,24 +5,24 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: ethereum/contract
-    name: PowerOracle
+    name: PowerOracleV2
     network: mainnet
     source:
-      address: "0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB"
-      abi: PowerOracle
-      startBlock: 11352346
+      address: "0x50f8D7f4db16AA926497993F020364f739EDb988"
+      abi: PowerOracleV2
+      startBlock: 11829649
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.4
       language: wasm/assemblyscript
       file: ./src/mappings/oracle.ts
       entities:
-        - PriceOracle
+        - PriceOracleV2
       abis:
-        - name: PowerOracle
-          file: ./abis/PowerOracle.json
+        - name: PowerOracleV2
+          file: ./abis/PowerOracleV2.json
       eventHandlers:
-        - event: AnchorPriceUpdated(string,uint256,uint256,uint256)
+        - event: AnchorPriceUpdated(string,indexed bytes32,uint256,uint256,uint256)
           handler: handleUnindexedUpdateV2
   - kind: ethereum/contract
     name: Factory
@@ -94,8 +94,8 @@ templates:
           file: ./abis/BToken.json
         - name: BTokenBytes
           file: ./abis/BTokenBytes32.json
-        - name: PowerOracle
-          file: ./abis/PowerOracle.json
+        - name: PowerOracleV2
+          file: ./abis/PowerOracleV2.json
       eventHandlers:
         - event: LOG_CALL(indexed bytes4,indexed address,bytes)
           topic0: "0x34e1990700000000000000000000000000000000000000000000000000000000"

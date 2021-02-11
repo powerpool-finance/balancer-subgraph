@@ -20,7 +20,7 @@ import { BTokenBytes } from '../types/templates/Pool/BTokenBytes'
 import { BToken } from '../types/templates/Pool/BToken'
 import { CRPFactory } from '../types/Factory/CRPFactory'
 import { ConfigurableRightsPool } from '../types/Factory/ConfigurableRightsPool'
-import { PowerOracle } from '../types/PowerOracle/PowerOracle'
+import { PowerOracleV2 } from '../types/PowerOracleV2/PowerOracleV2'
 
 export let ZERO_BD = BigDecimal.fromString('0')
 let ONE_HOUR = 3600;
@@ -181,9 +181,15 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
 
   // Create or update token price
 
-  let powerOracle = PowerOracle.bind(Address.fromString('0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB'));
+  // v1 - after PowerOracleV1 had been deployed
+  // if (blockNumber.gt(BigInt.fromI32(11146897))) {
+  // v2 - after PowerOracleV2 had been deployed
+  if (blockNumber.gt(BigInt.fromI32(11829649))) {
+    // V1:
+    // let powerOracle = PowerOracleV1.bind(Address.fromString('0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB'));
+    // V2:
+    let powerOracle = PowerOracleV2.bind(Address.fromString('0x50f8D7f4db16AA926497993F020364f739EDb988'));
 
-  if (blockNumber.gt(BigInt.fromI32(11146897))) {
     for (let i: i32 = 0; i < tokensList.length; i++) {
       let tokenPriceId = tokensList[i].toHexString()
       let tokenPrice = TokenPrice.load(tokenPriceId)

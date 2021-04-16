@@ -196,57 +196,34 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
       if (tokenPrice == null) {
         tokenPrice = new TokenPrice(tokenPriceId)
         tokenPrice.poolTokenId = ''
-        tokenPrice.poolLiquidity = ZERO_BD
       }
 
       let poolTokenId = id.concat('-').concat(tokenPriceId)
       let poolToken = PoolToken.load(poolTokenId)
 
-      // It is enough to assign the poolLiquidity using only the first token weight
-      if (i === 0) {
-        poolLiquidity = poolToken.balance.div(poolToken.denormWeight).times(pool.totalWeight)
-      }
-
+      // add pool and new price getters
       let res = powerOracle.try_getPriceBySymbol(poolToken.symbol);
       if (res.reverted) {
         log.warning("Missing oracle info for token {}", [tokenPrice.name])
         tokenPrice.price = BigDecimal.fromString("0");
       } else {
         tokenPrice.price = res.value.toBigDecimal().div(BigDecimal.fromString("1000000"))
+        poolLiquidity = poolLiquidity.plus(poolToken.balance.times(tokenPrice.price));
       }
 
       tokenPrice.symbol = poolToken.symbol
       tokenPrice.name = poolToken.name
       tokenPrice.decimals = poolToken.decimals
-      tokenPrice.poolLiquidity = poolLiquidity
       tokenPrice.poolTokenId = poolTokenId
       tokenPrice.save()
     }
   }
 
-  // Update pool liquidity
-
-  let liquidity = ZERO_BD
-  let denormWeight = ZERO_BD
-
-  for (let i: i32 = 0; i < tokensList.length; i++) {
-    let tokenPriceId = tokensList[i].toHexString()
-    let tokenPrice = TokenPrice.load(tokenPriceId)
-    if (tokenPrice !== null) {
-      let poolTokenId = id.concat('-').concat(tokenPriceId)
-      let poolToken = PoolToken.load(poolTokenId)
-      if (poolToken.denormWeight.gt(denormWeight)) {
-        denormWeight = poolToken.denormWeight
-        liquidity = tokenPrice.price.times(poolToken.balance).div(poolToken.denormWeight).times(pool.totalWeight)
-      }
-    }
-  }
-
   let factory = Balancer.load('1')
-  factory.totalLiquidity = factory.totalLiquidity.minus(pool.liquidity).plus(liquidity)
+  factory.totalLiquidity = factory.totalLiquidity.minus(pool.liquidity).plus(poolLiquidity)
   factory.save()
 
-  pool.liquidity = liquidity
+  pool.liquidity = poolLiquidity
   pool.save()
 }
 

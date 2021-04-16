@@ -1,10 +1,14 @@
 import {doPoolPriceCheckpoint} from "./helpers";
 import {Pool} from "../types/schema";
-import {ethereum} from "@graphprotocol/graph-ts";
+import {BigInt, ethereum} from "@graphprotocol/graph-ts";
 // import {AnchorPriceUpdated as AnchorPriceUpdatedV1} from "../types/PowerOracleV1/PowerOracleV1";
 import {AnchorPriceUpdated as AnchorPriceUpdatedV2} from "../types/PowerOracleV2/PowerOracleV2";
 
 function updatePool(poolId: string, event: ethereum.Event): void {
+  if (event.block.number.lt(BigInt.fromI32(11829649))) {
+    return;
+  }
+
   let pool = Pool.load(poolId);
   if (pool == null) {
     return;

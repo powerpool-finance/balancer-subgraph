@@ -20,6 +20,7 @@ import {
   ZERO_BD, doPoolPriceCheckpoint
 } from './helpers'
 
+let YLA_POOL = "0x9ba60ba98413a60db4c651d4afe5c937bbd8044b";
 /************************************
  ********** Pool Controls ***********
  ************************************/
@@ -120,7 +121,8 @@ export function handleRebind(event: LOG_CALL): void {
   if (balance.equals(ZERO_BD)) pool.active = false
   pool.save()
 
-  updatePoolLiquidity(poolId, event.block.number)
+  // updatePoolLiquidity(poolId, event.block.number)
+  doPoolPriceCheckpoint(event.block, pool as Pool);
   saveTransaction(event, 'rebind')
 }
 
@@ -166,7 +168,8 @@ export function handleGulp(call: GulpCall): void {
     poolToken.save()
   }
 
-  updatePoolLiquidity(poolId, call.block.number)
+  // updatePoolLiquidity(poolId, call.block.number)
+  doPoolPriceCheckpoint(call.block, pool as Pool);
 }
 
 /************************************
@@ -187,7 +190,8 @@ export function handleJoinPool(event: LOG_JOIN): void {
   poolToken.balance = newAmount
   poolToken.save()
 
-  updatePoolLiquidity(poolId, event.block.number)
+  // updatePoolLiquidity(poolId, event.block.number)
+  doPoolPriceCheckpoint(event.block, pool as Pool, event);
   saveTransaction(event, 'join')
 }
 
@@ -207,7 +211,8 @@ export function handleExitPool(event: LOG_EXIT): void {
   if (newAmount.equals(ZERO_BD)) pool.active = false
   pool.save()
 
-  updatePoolLiquidity(poolId, event.block.number)
+  // updatePoolLiquidity(poolId, event.block.number)
+  doPoolPriceCheckpoint(event.block, pool as Pool, event);
   saveTransaction(event, 'exit')
 }
 
@@ -234,7 +239,9 @@ export function handleSwap(event: LOG_SWAP): void {
   poolTokenOut.balance = newAmountOut
   poolTokenOut.save()
 
-  updatePoolLiquidity(poolId, event.block.number)
+  let pool = Pool.load(poolId)
+  // updatePoolLiquidity(poolId, event.block.number)
+  doPoolPriceCheckpoint(event.block, pool as Pool);
 
   let swapId = event.transaction.hash.toHexString().concat('-').concat(event.logIndex.toString())
   let swap = Swap.load(swapId)
@@ -242,7 +249,6 @@ export function handleSwap(event: LOG_SWAP): void {
     swap = new Swap(swapId)
   }
 
-  let pool = Pool.load(poolId)
   let tokenPrice = TokenPrice.load(tokenOut)
   let totalSwapVolume = pool.totalSwapVolume
   let totalSwapFee = pool.totalSwapFee
@@ -328,7 +334,7 @@ export function handleSwap(event: LOG_SWAP): void {
     poolShareTo.balance += tokenToDecimal(event.params.value.toBigDecimal(), 18)
     poolShareTo.save()
     pool.totalShares += tokenToDecimal(event.params.value.toBigDecimal(), 18)
-    doPoolPriceCheckpoint(event.block, pool as Pool)
+    doPoolPriceCheckpoint(event.block, pool as Pool, event)
   } else if (isBurn) {
     if (poolShareFrom == null) {
     createPoolShareEntity(poolShareFromId, poolId, event.params.from.toHex())
@@ -337,7 +343,7 @@ export function handleSwap(event: LOG_SWAP): void {
     poolShareFrom.balance -= tokenToDecimal(event.params.value.toBigDecimal(), 18)
     poolShareFrom.save()
     pool.totalShares -= tokenToDecimal(event.params.value.toBigDecimal(), 18)
-    doPoolPriceCheckpoint(event.block, pool as Pool)
+    doPoolPriceCheckpoint(event.block, pool as Pool, event)
   } else {
     if (poolShareTo == null) {
       createPoolShareEntity(poolShareToId, poolId, event.params.to.toHex())
@@ -352,6 +358,9 @@ export function handleSwap(event: LOG_SWAP): void {
     }
     poolShareFrom.balance -= tokenToDecimal(event.params.value.toBigDecimal(), 18)
     poolShareFrom.save()
+    if (pool.id == YLA_POOL) {
+      doPoolPriceCheckpoint(event.block, pool as Pool, event)
+    }
   }
 
   if (

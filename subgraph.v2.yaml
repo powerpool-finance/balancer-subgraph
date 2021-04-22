@@ -96,6 +96,10 @@ templates:
           file: ./abis/BTokenBytes32.json
         - name: PowerOracleV2
           file: ./abis/PowerOracleV2.json
+        - name: IYearnVault
+          file: ./abis/IYearnVault.json
+        - name: ICurvePoolRegistry
+          file: ./abis/ICurvePoolRegistry.json
       eventHandlers:
         - event: LOG_CALL(indexed bytes4,indexed address,bytes)
           topic0: "0x34e1990700000000000000000000000000000000000000000000000000000000"

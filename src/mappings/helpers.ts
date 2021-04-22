@@ -21,9 +21,13 @@ import { BToken } from '../types/templates/Pool/BToken'
 import { CRPFactory } from '../types/Factory/CRPFactory'
 import { ConfigurableRightsPool } from '../types/Factory/ConfigurableRightsPool'
 import { PowerOracleV2 } from '../types/PowerOracleV2/PowerOracleV2'
+import {IYearnVault} from "../types/PowerOracleV2/IYearnVault";
+import {ICurvePoolRegistry} from "../types/PowerOracleV2/ICurvePoolRegistry";
 
-export let ZERO_BD = BigDecimal.fromString('0')
+export let ZERO_BD = BigDecimal.fromString('0');
+export let ONE_ETHER = BigDecimal.fromString("1000000000000000000");
 let ONE_HOUR = 3600;
+let YLA_POOL = "0x9ba60ba98413a60db4c651d4afe5c937bbd8044b";
 
 let network = dataSource.network()
 
@@ -135,11 +139,17 @@ export function createPoolTokenEntity(id: string, pool: string, address: string)
   poolToken.save()
 }
 
-export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool): void {
+export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool, event: ethereum.Event = null): void {
+  let tx = "";
+  if (event != null) {
+    tx = event.transaction.hash.toHexString();
+  }
+
   if (pool.lastPoolPriceUpdate + ONE_HOUR > block.timestamp.toI32()) {
     log.info(
-      "doPoolPriceCheckpoint::Skipping checkpoint at {}, the last one is {}, the diff is {}",
+      "doPoolPriceCheckpoint()::Skipping pool {} checkpoint at {}, the last one is {}, the diff is {}",
       [
+        pool.id,
         block.timestamp.toString(),
         BigInt.fromI32(pool.lastPoolPriceUpdate).toString(),
         (BigInt.fromI32(pool.lastPoolPriceUpdate).minus(block.timestamp)).toString()
@@ -147,7 +157,7 @@ export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool): void {
     );
     return;
   }
-  updatePoolLiquidity(pool.id, block.number);
+  updatePoolLiquidity(pool, block.number);
 
   let id = pool.id.concat("-").concat(block.timestamp.toString());
   let poolPrice = PoolPrice.load(id);
@@ -163,6 +173,7 @@ export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool): void {
   }
   poolPrice.totalSupply = pool.totalShares;
   poolPrice.liquidity = pool.liquidity;
+  poolPrice.blockNumber = block.number.toI32();
   poolPrice.timestamp = block.timestamp.toI32();
   poolPrice.save();
 
@@ -171,11 +182,10 @@ export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool): void {
   pool.save();
 }
 
-export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
-  let pool = Pool.load(id)
+export function updatePoolLiquidity(pool: Pool, blockNumber: BigInt): void {
   let tokensList: Array<Bytes> = pool.tokensList
 
-  if (!tokensList || pool.tokensCount.lt(BigInt.fromI32(2)) || !pool.publicSwap) return
+  if (!tokensList || pool.tokensCount.lt(BigInt.fromI32(2)) || !pool.publicSwap) return;
 
   let poolLiquidity = ZERO_BD
 
@@ -188,7 +198,6 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
     // V1:
     // let powerOracle = PowerOracleV1.bind(Address.fromString('0x019e14DA4538ae1BF0BCd8608ab8595c6c6181FB'));
     // V2:
-    let powerOracle = PowerOracleV2.bind(Address.fromString('0x50f8D7f4db16AA926497993F020364f739EDb988'));
 
     for (let i: i32 = 0; i < tokensList.length; i++) {
       let tokenPriceId = tokensList[i].toHexString()
@@ -198,18 +207,28 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
         tokenPrice.poolTokenId = ''
       }
 
-      let poolTokenId = id.concat('-').concat(tokenPriceId)
+      let poolTokenId = pool.id.concat('-').concat(tokenPriceId)
       let poolToken = PoolToken.load(poolTokenId)
+      let priceSource = "";
 
       // add pool and new price getters
-      let res = powerOracle.try_getPriceBySymbol(poolToken.symbol);
-      if (res.reverted) {
-        log.warning("Missing oracle info for token {}", [tokenPrice.name])
-        tokenPrice.price = BigDecimal.fromString("0");
+      if (pool.id == YLA_POOL) {
+        priceSource = "yearn-vault";
+        tokenPrice.price = getVaultPrice(Address.fromString(poolToken.address));
       } else {
-        tokenPrice.price = res.value.toBigDecimal().div(BigDecimal.fromString("1000000"))
-        poolLiquidity = poolLiquidity.plus(poolToken.balance.times(tokenPrice.price));
+        priceSource = "p-oracle";
+        tokenPrice.price = getOraclePrice(poolToken.symbol);
       }
+
+      let tokenLiquidity = poolToken.balance.times(tokenPrice.price);
+      if (tokenPrice.price.gt(ZERO_BD)) {
+        poolLiquidity = poolLiquidity.plus(tokenLiquidity);
+      }
+
+      log.info(
+        "updatePoolLiquidity()::tokenLiquidity: poolId: {}, poolToken: {}, poolTokenId: {}, tokenPrice: {}, tokenLiquidity: {}, priceSource: {}",
+        [pool.id, poolToken.symbol, poolToken.address, tokenPrice.price.toString(), tokenLiquidity.toString(), priceSource]
+      );
 
       tokenPrice.symbol = poolToken.symbol
       tokenPrice.name = poolToken.name
@@ -222,9 +241,59 @@ export function updatePoolLiquidity(id: string, blockNumber: BigInt): void {
   let factory = Balancer.load('1')
   factory.totalLiquidity = factory.totalLiquidity.minus(pool.liquidity).plus(poolLiquidity)
   factory.save()
+  log.info(
+    "updatePoolLiquidity()::poolLiquidity: poolId: {}, factoryLiquidity: {}, oldLiquidity: {}, newLiquidity: {}",
+    [pool.id, factory.totalLiquidity.toString(), pool.liquidity.toString(), poolLiquidity.toString()]
+  );
 
   pool.liquidity = poolLiquidity
   pool.save()
+}
+
+let powerOracle = PowerOracleV2.bind(Address.fromString('0x50f8D7f4db16AA926497993F020364f739EDb988'));
+
+function getOraclePrice(tokenSymbol: string): BigDecimal {
+  let res = powerOracle.try_getPriceBySymbol(tokenSymbol);
+  if (res.reverted) {
+    log.warning("Missing oracle info for token {}", [tokenSymbol])
+    return ZERO_BD
+  } else {
+    return res.value.toBigDecimal().div(BigDecimal.fromString("1000000"))
+  }
+}
+
+let curveRegistry = ICurvePoolRegistry.bind(Address.fromString('0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c'));
+
+function getVaultPrice(vaultAddress: Address): BigDecimal {
+  let yearnVault = IYearnVault.bind(vaultAddress);
+  let res = yearnVault.try_getPricePerFullShare();
+
+  if (res.reverted) {
+    log.warning("Error getting pricePerFullShare for vault {}", [vaultAddress.toHexString()])
+    return ZERO_BD;
+  }
+  let pricePerShare = res.value.toBigDecimal().div(ONE_ETHER);
+
+  let res2: ethereum.CallResult<Address> = yearnVault.try_token();
+  if (res2.reverted) {
+    log.warning("Error getting token info  for vault:{}", [vaultAddress.toHexString()])
+    return ZERO_BD;
+  }
+  let crvToken = res2.value.toHexString();
+
+  let res3 = curveRegistry.try_get_virtual_price_from_lp_token(Address.fromString(crvToken));
+  if (res3.reverted) {
+    log.warning("Failed getting virtual for token:{}", [crvToken])
+    return ZERO_BD;
+  }
+  let virtualPrice = res3.value.toBigDecimal();
+
+  log.debug(
+    "getVaultPrice()::info: {}, pricePerShare {}, virtualPrice: {}",
+    [vaultAddress.toHexString(), pricePerShare.toString(), virtualPrice.toString()]
+  )
+
+  return pricePerShare.times(virtualPrice).div(ONE_ETHER);
 }
 
 export function saveTransaction(event: ethereum.Event, eventName: string): void {

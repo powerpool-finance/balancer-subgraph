@@ -21,8 +21,9 @@ import { BToken } from '../types/templates/Pool/BToken'
 import { CRPFactory } from '../types/Factory/CRPFactory'
 import { ConfigurableRightsPool } from '../types/Factory/ConfigurableRightsPool'
 import { PowerOracleV2 } from '../types/PowerOracleV2/PowerOracleV2'
-import {IYearnVault} from "../types/PowerOracleV2/IYearnVault";
 import {ICurvePoolRegistry} from "../types/PowerOracleV2/ICurvePoolRegistry";
+import {IYearnVaultV1} from "../types/templates/Pool/IYearnVaultV1";
+import {IYearnVaultV2} from "../types/templates/Pool/IYearnVaultV2";
 
 export let ZERO_BD = BigDecimal.fromString('0');
 export let ONE_ETHER = BigDecimal.fromString("1000000000000000000");
@@ -213,11 +214,25 @@ export function updatePoolLiquidity(pool: Pool, blockNumber: BigInt): void {
 
       // add pool and new price getters
       if (pool.id == YLA_POOL) {
-        priceSource = "yearn-vault";
-        tokenPrice.price = getVaultPrice(Address.fromString(poolToken.address));
+        priceSource = "yearn-vault-v1";
+        if (poolToken.address == '0x2994529c0652d127b7842094103715ec5299bbed'
+          || poolToken.address == '0xcc7e70a958917cce67b4b87a8c30e6297451ae98'
+          || poolToken.address == '0x629c759d1e83efbf63d84eb3868b564d9521c129'
+          || poolToken.address == '0x5dbcf33d8c2e976c6b560249878e6f1491bca25c'
+          || poolToken.address == '0x9ca85572e6a3ebf24dedd195623f188735a5179f'
+        ) {
+          tokenPrice.price = getVaultV1Price(Address.fromString(poolToken.address));
+        } else {
+          priceSource = "yearn-vault-v2";
+          tokenPrice.price = getVaultV2Price(Address.fromString(poolToken.address));
+        }
       } else {
         priceSource = "p-oracle";
-        tokenPrice.price = getOraclePrice(poolToken.symbol);
+        let symbol = poolToken.symbol;
+        if (poolToken.symbol == 'piSushi') {
+          symbol = 'SUSHI';
+        }
+        tokenPrice.price = getOraclePrice(symbol);
       }
 
       let tokenLiquidity = poolToken.balance.times(tokenPrice.price);
@@ -264,12 +279,44 @@ function getOraclePrice(tokenSymbol: string): BigDecimal {
 
 let curveRegistry = ICurvePoolRegistry.bind(Address.fromString('0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c'));
 
-function getVaultPrice(vaultAddress: Address): BigDecimal {
-  let yearnVault = IYearnVault.bind(vaultAddress);
+function getVaultV1Price(vaultAddress: Address): BigDecimal {
+  let yearnVault = IYearnVaultV1.bind(vaultAddress);
   let res = yearnVault.try_getPricePerFullShare();
 
   if (res.reverted) {
     log.warning("Error getting pricePerFullShare for vault {}", [vaultAddress.toHexString()])
+    return ZERO_BD;
+  }
+  let pricePerShare = res.value.toBigDecimal().div(ONE_ETHER);
+
+  let res2: ethereum.CallResult<Address> = yearnVault.try_token();
+  if (res2.reverted) {
+    log.warning("Error getting token info  for vault:{}", [vaultAddress.toHexString()])
+    return ZERO_BD;
+  }
+  let crvToken = res2.value.toHexString();
+
+  let res3 = curveRegistry.try_get_virtual_price_from_lp_token(Address.fromString(crvToken));
+  if (res3.reverted) {
+    log.warning("Failed getting virtual for token:{}", [crvToken])
+    return ZERO_BD;
+  }
+  let virtualPrice = res3.value.toBigDecimal();
+
+  log.debug(
+    "getVaultPrice()::info: {}, pricePerShare {}, virtualPrice: {}",
+    [vaultAddress.toHexString(), pricePerShare.toString(), virtualPrice.toString()]
+  )
+
+  return pricePerShare.times(virtualPrice).div(ONE_ETHER);
+}
+
+function getVaultV2Price(vaultAddress: Address): BigDecimal {
+  let yearnVault = IYearnVaultV2.bind(vaultAddress);
+  let res = yearnVault.try_pricePerShare();
+
+  if (res.reverted) {
+    log.warning("Error getting pricePerShare for vault {}", [vaultAddress.toHexString()])
     return ZERO_BD;
   }
   let pricePerShare = res.value.toBigDecimal().div(ONE_ETHER);

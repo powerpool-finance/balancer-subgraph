@@ -141,11 +141,6 @@ export function createPoolTokenEntity(id: string, pool: string, address: string)
 }
 
 export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool, event: ethereum.Event = null): void {
-  let tx = "";
-  if (event != null) {
-    tx = event.transaction.hash.toHexString();
-  }
-
   if (pool.lastPoolPriceUpdate + ONE_HOUR > block.timestamp.toI32()) {
     log.info(
       "doPoolPriceCheckpoint()::Skipping pool {} checkpoint at {}, the last one is {}, the diff is {}",
@@ -156,14 +151,50 @@ export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool, event: 
         (BigInt.fromI32(pool.lastPoolPriceUpdate).minus(block.timestamp)).toString()
       ]
     );
+    //
+    // let id = pool.id.concat("-").concat(BigInt.fromI32(pool.lastPoolPriceUpdate).toString());
+    // let poolPrice = PoolPrice.load(id);
+    // if (poolPrice == null) {
+    //   return;
+    // }
+    //
+    // if (pool.totalShares.gt(BigDecimal.fromString("0"))) {
+    //   poolPrice.price = pool.liquidity.div(pool.totalShares);
+    // }  else {
+    //   poolPrice.price = BigDecimal.fromString("0");
+    // }
+    // poolPrice.totalSupply = pool.totalShares;
+    // poolPrice.blockNumber = block.number.toI32();
+    // poolPrice.timestamp = block.timestamp.toI32();
+    // poolPrice.id = pool.id.concat("-").concat(block.timestamp.toString());
+    // poolPrice.save();
+    //
+    // log.info(
+    //   "doPoolPriceCheckpoint()::PoolPriceUpdateSkip pool_id: {} blockNumber: {} timestamp: {} totalSupply: {} liquidity: {} price: {} update: {}",
+    //   [
+    //     pool.id,
+    //     block.number.toString(),
+    //     block.timestamp.toString(),
+    //     pool.totalShares.toString(),
+    //     pool.liquidity.toString(),
+    //     poolPrice.price.toString(),
+    //     "true",
+    //   ]
+    // );
+    //
+    // pool.lastPoolPriceUpdate = block.timestamp.toI32();
+    // pool.save();
+
     return;
   }
   updatePoolLiquidity(pool, block.number);
 
   let id = pool.id.concat("-").concat(block.timestamp.toString());
+  let update = true;
   let poolPrice = PoolPrice.load(id);
   if (poolPrice == null) {
     poolPrice = new PoolPrice(id);
+    update = false;
   }
 
   poolPrice.poolId = pool.id;
@@ -177,6 +208,18 @@ export function doPoolPriceCheckpoint(block: ethereum.Block, pool: Pool, event: 
   poolPrice.blockNumber = block.number.toI32();
   poolPrice.timestamp = block.timestamp.toI32();
   poolPrice.save();
+  log.info(
+    "doPoolPriceCheckpoint()::PoolPriceUpdateSync pool_id: {} blockNumber: {} timestamp: {} totalSupply: {} liquidity: {} price: {} update: {}",
+    [
+      pool.id,
+      block.number.toString(),
+      block.timestamp.toString(),
+      pool.totalShares.toString(),
+      pool.liquidity.toString(),
+      poolPrice.price.toString(),
+      update ? "true" : "false",
+    ]
+  );
 
   pool.lastPoolPriceUpdate = block.timestamp.toI32();
   pool.poolPriceCount = pool.poolPriceCount.plus(BigInt.fromI32(1));
@@ -277,7 +320,7 @@ function getOraclePrice(tokenSymbol: string): BigDecimal {
   }
 }
 
-let curveRegistry = ICurvePoolRegistry.bind(Address.fromString('0x7D86446dDb609eD0F5f8684AcF30380a356b2B4c'));
+let curveRegistry = ICurvePoolRegistry.bind(Address.fromString('0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5'));
 
 function getVaultV1Price(vaultAddress: Address): BigDecimal {
   let yearnVault = IYearnVaultV1.bind(vaultAddress);

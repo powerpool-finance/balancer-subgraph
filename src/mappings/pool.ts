@@ -122,7 +122,7 @@ export function handleRebind(event: LOG_CALL): void {
   pool.save()
 
   // updatePoolLiquidity(poolId, event.block.number)
-  doPoolPriceCheckpoint(event.block, pool as Pool);
+  // doPoolPriceCheckpoint(event.block, pool as Pool);
   saveTransaction(event, 'rebind')
 }
 
@@ -169,7 +169,7 @@ export function handleGulp(call: GulpCall): void {
   }
 
   // updatePoolLiquidity(poolId, call.block.number)
-  doPoolPriceCheckpoint(call.block, pool as Pool);
+  // doPoolPriceCheckpoint(call.block, pool as Pool);
 }
 
 /************************************
@@ -191,7 +191,7 @@ export function handleJoinPool(event: LOG_JOIN): void {
   poolToken.save()
 
   // updatePoolLiquidity(poolId, event.block.number)
-  doPoolPriceCheckpoint(event.block, pool as Pool, event);
+  // doPoolPriceCheckpoint(event.block, pool as Pool, event);
   saveTransaction(event, 'join')
 }
 
@@ -212,7 +212,7 @@ export function handleExitPool(event: LOG_EXIT): void {
   pool.save()
 
   // updatePoolLiquidity(poolId, event.block.number)
-  doPoolPriceCheckpoint(event.block, pool as Pool, event);
+  // doPoolPriceCheckpoint(event.block, pool as Pool, event);
   saveTransaction(event, 'exit')
 }
 

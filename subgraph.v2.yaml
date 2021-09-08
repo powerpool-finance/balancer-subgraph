@@ -96,8 +96,10 @@ templates:
           file: ./abis/BTokenBytes32.json
         - name: PowerOracleV2
           file: ./abis/PowerOracleV2.json
-        - name: IYearnVault
-          file: ./abis/IYearnVault.json
+        - name: IYearnVaultV1
+          file: ./abis/IYearnVaultV1.json
+        - name: IYearnVaultV2
+          file: ./abis/IYearnVaultV2.json
         - name: ICurvePoolRegistry
           file: ./abis/ICurvePoolRegistry.json
       eventHandlers:
